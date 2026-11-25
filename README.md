@@ -220,7 +220,7 @@ For **each** environment (`sandbox` and `production`), under repo
 | `SSH_KEY`             | Private key (PEM) authorized for that user                        |
 | `DEPLOY_PATH`         | Absolute path on the server holding `.env` (e.g. `/opt/s-erp-api`) |
 
-Optional environment variable (same screen, "Variables" tab): `SSH_PORT`
+Optional secret (same "Add secret" screen, not "Variables"): `SSH_PORT`
 (defaults to `22`).
 
 No secret is needed for the GHCR push/pull — it uses the workflow's own

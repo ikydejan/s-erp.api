@@ -58,7 +58,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ vars.SSH_PORT || 22 }}
+          port: ${{ secrets.SSH_PORT || 22 }}
           source: "docker-compose.deploy.yml"
           target: ${{ secrets.DEPLOY_PATH }}
 
@@ -73,7 +73,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ vars.SSH_PORT || 22 }}
+          port: ${{ secrets.SSH_PORT || 22 }}
           envs: IMAGE_API,IMAGE_WORKER,GH_ACTOR,GH_TOKEN
           script: |
             set -e
