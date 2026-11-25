@@ -1,0 +1,16 @@
+[package]
+name = "notification"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+erp-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+web-push = "0.10"
+utoipa = "4"

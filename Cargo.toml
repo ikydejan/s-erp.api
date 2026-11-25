@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/auth",
+    "crates/audit",
+    "crates/delegation",
+    "crates/notification",
+    "crates/cqrs",
+    "crates/infra-postgres",
+    "crates/infra-opensearch",
+    "crates/api",
+    "crates/worker",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+erp-core = { path = "crates/core" }
+auth = { path = "crates/auth" }
+audit = { path = "crates/audit" }
+delegation = { path = "crates/delegation" }
+notification = { path = "crates/notification" }
+cqrs = { path = "crates/cqrs" }
+infra-postgres = { path = "crates/infra-postgres" }
+infra-opensearch = { path = "crates/infra-opensearch" }
+
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
+axum = { version = "0.7", features = ["macros"] }
+dotenvy = "0.15"

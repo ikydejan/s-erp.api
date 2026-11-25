@@ -1,0 +1,17 @@
+[package]
+name = "infra-opensearch"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+erp-core.workspace = true
+cqrs = { path = "../cqrs" }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+opensearch = "2"

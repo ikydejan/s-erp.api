@@ -1,0 +1,39 @@
+[package]
+name = "api"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+[dependencies]
+erp-core.workspace = true
+auth = { path = "../auth" }
+audit = { path = "../audit" }
+delegation = { path = "../delegation" }
+notification = { path = "../notification" }
+cqrs = { path = "../cqrs" }
+infra-postgres = { path = "../infra-postgres" }
+infra-opensearch = { path = "../infra-opensearch" }
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+async-trait.workspace = true
+sqlx.workspace = true
+axum.workspace = true
+dotenvy.workspace = true
+
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "6", features = ["axum"] }
+validator = { version = "0.18", features = ["derive"] }
