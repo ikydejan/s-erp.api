@@ -4,13 +4,23 @@
 # A `.env` file with real secrets for that environment must already exist
 # next to this file on the server (see README.md "Deploy") — it is never
 # created or copied by CI.
-#
-# Postgres is NOT run as a container here: both environments use a Postgres
-# that already runs directly on the host OS. `api`/`worker` reach it via
-# `host.docker.internal` (mapped below with extra_hosts), so set
-# DATABASE_URL in .env to something like
-# postgres://user:pass@host.docker.internal:5432/dbname.
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp}
+      POSTGRES_DB: ${POSTGRES_DB:-erp}
+    volumes:
+      - erp_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-erp} -d ${POSTGRES_DB:-erp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   opensearch:
     image: opensearchproject/opensearch:2.17.0
     restart: unless-stopped
@@ -31,11 +41,11 @@ services:
     image: ${IMAGE_API}
     restart: unless-stopped
     env_file: .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     depends_on:
+      postgres:
+        condition: service_healthy
       opensearch:
         condition: service_healthy
 
@@ -43,11 +53,12 @@ services:
     image: ${IMAGE_WORKER}
     restart: unless-stopped
     env_file: .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
+      postgres:
+        condition: service_healthy
       opensearch:
         condition: service_healthy
 
 volumes:
+  erp_postgres_data:
   erp_opensearch_data:
