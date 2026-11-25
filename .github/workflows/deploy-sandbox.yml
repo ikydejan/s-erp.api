@@ -1,17 +1,17 @@
-name: Deploy to Development
+name: Deploy to Sandbox
 
 on:
   push:
-    branches: [development]
+    branches: [sandbox]
 
 concurrency:
-  group: deploy-development
+  group: deploy-sandbox
   cancel-in-progress: false
 
 jobs:
   deploy:
     uses: ./.github/workflows/_deploy.yml
     with:
-      environment: development
-      image_tag: dev
+      environment: sandbox
+      image_tag: sandbox
     secrets: inherit
