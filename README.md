@@ -197,29 +197,16 @@ CI never creates or touches secrets on the server — it only pulls images and
 runs `docker compose up -d`. Before the first deploy to an environment, set
 up its server once:
 
-1. Create the deploy directory, e.g. `/opt/s-erp-api`, owned by `SSH_USER`
-   (`sudo mkdir -p /opt/s-erp-api && sudo chown -R <ssh_user>:<ssh_user> /opt/s-erp-api`).
-2. Put a real `.env` file in it (copy `.env.example` as a starting point).
-   `docker-compose.deploy.yml` does **not** run Postgres as a container —
-   both environments use a Postgres that already runs on the host OS, so
-   point `DATABASE_URL` at `host.docker.internal` (mapped to the host via
-   `extra_hosts` in the compose file) instead of `localhost`, and point
-   `OPENSEARCH_URL` at the `opensearch` container, which this compose file
-   does run:
+1. Create the deploy directory, e.g. `/opt/s-erp-api`.
+2. Put a real `.env` file in it (copy `.env.example` as a starting point),
+   but point `DATABASE_URL`/`OPENSEARCH_URL` at the in-network service names
+   instead of `localhost`:
    ```
-   DATABASE_URL=postgres://<db_user>:<db_password>@host.docker.internal:5432/<db_name>
+   DATABASE_URL=postgres://erp:erp@postgres:5432/erp
    OPENSEARCH_URL=http://opensearch:9200
    ```
-   and use real values for `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, and `VAPID_*`.
-
-   The host's Postgres also needs to accept that connection, which a
-   default install usually doesn't out of the box:
-   - `listen_addresses` in `postgresql.conf` must include `*` (or at least
-     the Docker bridge address, not just `localhost`).
-   - `pg_hba.conf` needs a line allowing the Docker bridge subnet, e.g.
-     `host    <db_name>    <db_user>    172.17.0.0/16    scram-sha-256`
-     (check `docker network inspect bridge` if your subnet differs).
-   - Restart Postgres after changing either file.
+   and use real values for `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `VAPID_*`,
+   and the Postgres credentials.
 3. Make sure Docker + the Compose plugin are installed on the server, and
    that `SSH_USER` can run `docker` (e.g. is in the `docker` group).
 
