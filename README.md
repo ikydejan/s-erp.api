@@ -164,7 +164,7 @@ cargo run -p worker   # outbox dispatcher + notification sender + delegation swe
 See `.env.example` for the full list with comments. The required ones with
 no safe default are `DATABASE_URL`, `JWT_SECRET`, and `MFA_ENCRYPTION_KEY`.
 
-## Deploy (Staging & Development)
+## Deploy (Sandbox & Production)
 
 `.github/workflows/_deploy.yml` is a reusable workflow: it builds the `api`
 and `worker` images (`Dockerfile`, selected via `--build-arg
@@ -172,16 +172,26 @@ BIN_NAME=api|worker`), pushes them to GHCR, then SSHes into a server to pull
 and restart them with `docker-compose.deploy.yml`. Two thin workflows call
 it with different [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment):
 
-| Workflow                   | Triggers on push to | GitHub Environment | Image tag |
-|------------------------------|------------------------|-----------------------|-------------|
-| `deploy-staging.yml`         | `staging`                | `staging`                | `staging`     |
-| `deploy-development.yml`     | `development`            | `development`            | `dev`         |
+| Workflow                   | Triggers on push to | GitHub Environment | Image tag  |
+|------------------------------|------------------------|-----------------------|--------------|
+| `deploy-sandbox.yml`         | `sandbox`                 | `sandbox`                | `sandbox`      |
+| `deploy-production.yml`      | `production`              | `production`             | `production`   |
 
 Because each is a separate **GitHub Environment** (repo Settings →
 Environments), both can define secrets with the *same names* — `HOST`,
 `SSH_USER`, `SSH_KEY`, `DEPLOY_PATH` — with different values, and the
 workflow automatically reads the right one depending on which environment
-the job runs under. Nothing needs a `STAGING_`/`DEV_` prefix.
+the job runs under. Nothing needs a `SANDBOX_`/`PROD_` prefix.
+
+**Production requires manual approval before it deploys.** This is a GitHub
+setting, not something the workflow file can do on its own: go to repo
+**Settings → Environments → production → Deployment protection rules →
+Required reviewers**, and add at least one reviewer. With that set, the
+`deploy` job of `deploy-production.yml` (the part that SSHes into the
+server — the image build/push still runs immediately) pauses and waits for
+an approval in the Actions run page before it touches the production
+server. `sandbox` is left without this rule, so it deploys immediately on
+push.
 
 CI never creates or touches secrets on the server — it only pulls images and
 runs `docker compose up -d`. Before the first deploy to an environment, set
@@ -200,7 +210,7 @@ up its server once:
 3. Make sure Docker + the Compose plugin are installed on the server, and
    that `SSH_USER` can run `docker` (e.g. is in the `docker` group).
 
-For **each** environment (`staging` and `development`), under repo
+For **each** environment (`sandbox` and `production`), under repo
 **Settings → Environments → <name> → Add secret**, set:
 
 | Secret            | Purpose                                                      |
