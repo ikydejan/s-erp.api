@@ -164,15 +164,28 @@ cargo run -p worker   # outbox dispatcher + notification sender + delegation swe
 See `.env.example` for the full list with comments. The required ones with
 no safe default are `DATABASE_URL`, `JWT_SECRET`, and `MFA_ENCRYPTION_KEY`.
 
-## Deploy (Staging)
+## Deploy (Staging & Development)
 
-`.github/workflows/deploy-staging.yml` runs on every push to the `staging`
-branch: it builds the `api` and `worker` images (`Dockerfile`, selected via
-`--build-arg BIN_NAME=api|worker`), pushes them to GHCR, then SSHes into the
-staging server to pull and restart them with `docker-compose.staging.yml`.
+`.github/workflows/_deploy.yml` is a reusable workflow: it builds the `api`
+and `worker` images (`Dockerfile`, selected via `--build-arg
+BIN_NAME=api|worker`), pushes them to GHCR, then SSHes into a server to pull
+and restart them with `docker-compose.deploy.yml`. Two thin workflows call
+it with different [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment):
+
+| Workflow                   | Triggers on push to | GitHub Environment | Image tag |
+|------------------------------|------------------------|-----------------------|-------------|
+| `deploy-staging.yml`         | `staging`                | `staging`                | `staging`     |
+| `deploy-development.yml`     | `development`            | `development`            | `dev`         |
+
+Because each is a separate **GitHub Environment** (repo Settings →
+Environments), both can define secrets with the *same names* — `HOST`,
+`SSH_USER`, `SSH_KEY`, `DEPLOY_PATH` — with different values, and the
+workflow automatically reads the right one depending on which environment
+the job runs under. Nothing needs a `STAGING_`/`DEV_` prefix.
 
 CI never creates or touches secrets on the server — it only pulls images and
-runs `docker compose up -d`. Before the first deploy, set up the server once:
+runs `docker compose up -d`. Before the first deploy to an environment, set
+up its server once:
 
 1. Create the deploy directory, e.g. `/opt/s-erp-api`.
 2. Put a real `.env` file in it (copy `.env.example` as a starting point),
@@ -185,18 +198,20 @@ runs `docker compose up -d`. Before the first deploy, set up the server once:
    and use real values for `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `VAPID_*`,
    and the Postgres credentials.
 3. Make sure Docker + the Compose plugin are installed on the server, and
-   that `STAGING_USER` can run `docker` (e.g. is in the `docker` group).
+   that `SSH_USER` can run `docker` (e.g. is in the `docker` group).
 
-Required GitHub repository secrets:
+For **each** environment (`staging` and `development`), under repo
+**Settings → Environments → <name> → Add secret**, set:
 
-| Secret                 | Purpose                                              |
-|-------------------------|-------------------------------------------------------|
-| `STAGING_HOST`           | Staging server hostname/IP                            |
-| `STAGING_USER`           | SSH user used to deploy                                |
-| `STAGING_SSH_KEY`        | Private key (PEM) authorized for that user             |
-| `STAGING_DEPLOY_PATH`    | Absolute path on the server holding `.env` (e.g. `/opt/s-erp-api`) |
+| Secret            | Purpose                                                      |
+|---------------------|------------------------------------------------------------------|
+| `HOST`                | That environment's server hostname/IP                            |
+| `SSH_USER`            | SSH user used to deploy                                           |
+| `SSH_KEY`             | Private key (PEM) authorized for that user                        |
+| `DEPLOY_PATH`         | Absolute path on the server holding `.env` (e.g. `/opt/s-erp-api`) |
 
-Optional repository variable: `STAGING_SSH_PORT` (defaults to `22`).
+Optional environment variable (same screen, "Variables" tab): `SSH_PORT`
+(defaults to `22`).
 
 No secret is needed for the GHCR push/pull — it uses the workflow's own
 `GITHUB_TOKEN`.

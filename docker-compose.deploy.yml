@@ -1,7 +1,8 @@
-# Deployed to the staging server by .github/workflows/deploy-staging.yml.
-# Images are pulled from GHCR, not built here. A `.env` file with real
-# staging secrets must already exist next to this file on the server
-# (see README.md "Deploy (Staging)" for the required keys) — it is never
+# Deployed by .github/workflows/_deploy.yml (reusable), called from both
+# deploy-staging.yml (environment: staging) and deploy-development.yml
+# (environment: development). Images are pulled from GHCR, not built here.
+# A `.env` file with real secrets for that environment must already exist
+# next to this file on the server (see README.md "Deploy") — it is never
 # created or copied by CI.
 services:
   postgres:
