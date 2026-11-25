@@ -1,17 +1,17 @@
-name: Deploy to Staging
+name: Deploy to Production
 
 on:
   push:
-    branches: [staging]
+    branches: [production]
 
 concurrency:
-  group: deploy-staging
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
   deploy:
     uses: ./.github/workflows/_deploy.yml
     with:
-      environment: staging
-      image_tag: staging
+      environment: production
+      image_tag: production
     secrets: inherit
