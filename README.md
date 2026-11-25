@@ -166,62 +166,62 @@ no safe default are `DATABASE_URL`, `JWT_SECRET`, and `MFA_ENCRYPTION_KEY`.
 
 ## Deploy (Sandbox & Production)
 
-`.github/workflows/_deploy.yml` is a reusable workflow: it builds the `api`
-and `worker` images (`Dockerfile`, selected via `--build-arg
-BIN_NAME=api|worker`), pushes them to GHCR, then SSHes into a server to pull
-and restart them with `docker-compose.deploy.yml`. Two thin workflows call
-it with different [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment):
+Deployment is **pull-based**, not push-based: GitHub Actions never connects
+to either server. It only builds the `api`/`worker` images (`Dockerfile`,
+selected via `--build-arg BIN_NAME=api|worker`) and pushes them to GHCR
+under that environment's moving tag. A [Watchtower](https://containrrr.dev/watchtower/)
+container running on each server polls GHCR on its own and recreates
+`api`/`worker` whenever the tag's digest changes.
+
+`.github/workflows/_deploy.yml` is the reusable build workflow. Two thin
+workflows call it with different [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment):
 
 | Workflow                   | Triggers on push to | GitHub Environment | Image tag  |
 |------------------------------|------------------------|-----------------------|--------------|
 | `deploy-sandbox.yml`         | `sandbox`                 | `sandbox`                | `sandbox`      |
 | `deploy-production.yml`      | `production`              | `production`             | `production`   |
 
-Because each is a separate **GitHub Environment** (repo Settings →
-Environments), both can define secrets with the *same names* — `HOST`,
-`SSH_USER`, `SSH_KEY`, `DEPLOY_PATH` — with different values, and the
-workflow automatically reads the right one depending on which environment
-the job runs under. Nothing needs a `SANDBOX_`/`PROD_` prefix.
+**Production still requires manual approval**, but now it gates the image
+*build* itself (the only checkpoint left): go to repo **Settings →
+Environments → production → Deployment protection rules → Required
+reviewers**, and add at least one reviewer. With that set, the `build` job
+of `deploy-production.yml` pauses and waits for approval in the Actions run
+page before anything gets pushed to GHCR under the `production` tag — so
+nothing reaches `production`'s Watchtower until someone approves it.
+`sandbox` has no such rule, so it publishes immediately on push and
+Watchtower there picks it up within `--interval` seconds.
 
-**Production requires manual approval before it deploys.** This is a GitHub
-setting, not something the workflow file can do on its own: go to repo
-**Settings → Environments → production → Deployment protection rules →
-Required reviewers**, and add at least one reviewer. With that set, the
-`deploy` job of `deploy-production.yml` (the part that SSHes into the
-server — the image build/push still runs immediately) pauses and waits for
-an approval in the Actions run page before it touches the production
-server. `sandbox` is left without this rule, so it deploys immediately on
-push.
+No GitHub secrets are needed for this at all — GHCR push uses the
+workflow's own `GITHUB_TOKEN`, and Watchtower's GHCR pull auth lives only on
+the server (below). If you still have `HOST`/`SSH_USER`/`SSH_KEY`/
+`DEPLOY_PATH` secrets from an earlier SSH-based setup, they're unused now
+and can be deleted.
 
-CI never creates or touches secrets on the server — it only pulls images and
-runs `docker compose up -d`. Before the first deploy to an environment, set
-up its server once:
+### One-time server setup (per environment)
 
-1. Create the deploy directory, e.g. `/opt/s-erp-api`.
-2. Put a real `.env` file in it (copy `.env.example` as a starting point),
-   but point `DATABASE_URL`/`OPENSEARCH_URL` at the in-network service names
-   instead of `localhost`:
+1. Create a deploy directory, e.g. `/opt/s-erp-api`, and put
+   `docker-compose.deploy.yml` there (copy it from this repo).
+2. Put a real `.env` file next to it (copy `.env.example` as a starting
+   point) with:
+   - `DATABASE_URL`/`OPENSEARCH_URL` pointing at the in-network service
+     names, not `localhost`: `postgres://erp:erp@postgres:5432/erp` and
+     `http://opensearch:9200`.
+   - Real values for `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `VAPID_*`, and the
+     Postgres credentials.
+   - `IMAGE_API`/`IMAGE_WORKER` pointing at this environment's **moving**
+     tag (no commit SHA, since Watchtower needs a fixed tag to re-poll):
+     ```
+     IMAGE_API=ghcr.io/<owner>/s-erp-api:sandbox
+     IMAGE_WORKER=ghcr.io/<owner>/s-erp-worker:sandbox
+     ```
+     (use `:production` on the production server instead).
+3. Authenticate Docker on the server for GHCR, once, with a GitHub [PAT](https://github.com/settings/tokens)
+   that has `read:packages` (the packages are private by default):
+   ```bash
+   echo '<token>' | docker login ghcr.io -u <your-github-username> --password-stdin
    ```
-   DATABASE_URL=postgres://erp:erp@postgres:5432/erp
-   OPENSEARCH_URL=http://opensearch:9200
-   ```
-   and use real values for `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `VAPID_*`,
-   and the Postgres credentials.
-3. Make sure Docker + the Compose plugin are installed on the server, and
-   that `SSH_USER` can run `docker` (e.g. is in the `docker` group).
-
-For **each** environment (`sandbox` and `production`), under repo
-**Settings → Environments → <name> → Add secret**, set:
-
-| Secret            | Purpose                                                      |
-|---------------------|------------------------------------------------------------------|
-| `HOST`                | That environment's server hostname/IP                            |
-| `SSH_USER`            | SSH user used to deploy                                           |
-| `SSH_KEY`             | Private key (PEM) authorized for that user                        |
-| `DEPLOY_PATH`         | Absolute path on the server holding `.env` (e.g. `/opt/s-erp-api`) |
-
-Optional secret (same "Add secret" screen, not "Variables"): `SSH_PORT`
-(defaults to `22`).
-
-No secret is needed for the GHCR push/pull — it uses the workflow's own
-`GITHUB_TOKEN`.
+   Watchtower mounts this same `~/.docker/config.json` read-only to reuse
+   those credentials — no separate secret for it.
+4. Start the stack once by hand: `docker compose -f docker-compose.deploy.yml up -d`.
+   From here on, pushing to `sandbox`/`production` updates the running
+   containers automatically — no further manual steps.

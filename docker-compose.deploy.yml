@@ -1,9 +1,10 @@
-# Deployed by .github/workflows/_deploy.yml (reusable), called from both
-# deploy-sandbox.yml (environment: sandbox) and deploy-production.yml
-# (environment: production). Images are pulled from GHCR, not built here.
-# A `.env` file with real secrets for that environment must already exist
-# next to this file on the server (see README.md "Deploy") — it is never
-# created or copied by CI.
+# Pull-based deploy: CI (.github/workflows/_deploy.yml) only builds and
+# pushes images to GHCR under this environment's moving tag (e.g.
+# ghcr.io/<owner>/s-erp-api:sandbox) — it never touches this file or the
+# server. You run `docker compose up -d` here once, by hand, and from then
+# on the `watchtower` service below polls GHCR and recreates `api`/`worker`
+# whenever that tag's digest changes. See README.md ("Deploy") for the
+# one-time server setup (creating `.env`, `docker login` for watchtower).
 services:
   postgres:
     image: postgres:16-alpine
@@ -41,6 +42,8 @@ services:
     image: ${IMAGE_API}
     restart: unless-stopped
     env_file: .env
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     ports:
       - "8080:8080"
     depends_on:
@@ -53,11 +56,21 @@ services:
     image: ${IMAGE_WORKER}
     restart: unless-stopped
     env_file: .env
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       postgres:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
+    command: --interval 60 --label-enable --cleanup
 
 volumes:
   erp_postgres_data:
