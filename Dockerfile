@@ -1,18 +1,16 @@
 # syntax=docker/dockerfile:1
 # Build with: docker build --build-arg BIN_NAME=api -t s-erp-api .
 #             docker build --build-arg BIN_NAME=worker -t s-erp-worker .
+#
+# Note: this used to use cargo-chef for a separate dependency-caching layer,
+# but cargo-chef panics internally (cargo-chef 0.1.78, recipe.rs:224) when
+# cooking this workspace's recipe.json, so it was dropped in favor of a
+# plain `cargo build`. Layers still get Docker/BuildKit `type=gha` caching
+# via the build-push-action step, just without the finer dependency-only
+# cache split chef would normally provide.
 
-FROM rust:1-bookworm AS chef
-RUN cargo install cargo-chef --locked
+FROM rust:1-bookworm AS builder
 WORKDIR /app
-
-FROM chef AS planner
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM chef AS builder
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 ARG BIN_NAME
 RUN cargo build --release --bin ${BIN_NAME} \
