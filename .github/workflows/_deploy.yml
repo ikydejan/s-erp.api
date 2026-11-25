@@ -1,4 +1,15 @@
-name: Deploy (reusable)
+name: Build & Publish (reusable)
+
+# Pull-based delivery: this workflow only builds the api/worker images and
+# pushes them to GHCR with the environment's tag. It does NOT touch the
+# server — Watchtower running on each server polls GHCR and updates the
+# running containers itself. See docker-compose.deploy.yml and README.md
+# ("Deploy") for the server-side setup.
+#
+# The `environment` input still gates `production`: if that GitHub
+# Environment has required reviewers configured, the push step pauses for
+# approval before an image ever gets published under the `production` tag,
+# which is the only checkpoint before Watchtower picks it up.
 
 on:
   workflow_call:
@@ -13,6 +24,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
       packages: write
@@ -44,41 +56,3 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ inputs.image_tag }}-${{ github.sha }}
           cache-from: type=gha,scope=${{ inputs.environment }}-${{ matrix.bin }}
           cache-to: type=gha,mode=max,scope=${{ inputs.environment }}-${{ matrix.bin }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Copy deploy compose file to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: "docker-compose.deploy.yml"
-          target: ${{ secrets.DEPLOY_PATH }}
-
-      - name: Pull images & restart services
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          IMAGE_API: ghcr.io/${{ github.repository_owner }}/s-erp-api:${{ inputs.image_tag }}-${{ github.sha }}
-          IMAGE_WORKER: ghcr.io/${{ github.repository_owner }}/s-erp-worker:${{ inputs.image_tag }}-${{ github.sha }}
-          GH_ACTOR: ${{ github.actor }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          envs: IMAGE_API,IMAGE_WORKER,GH_ACTOR,GH_TOKEN
-          script: |
-            set -e
-            cd "${{ secrets.DEPLOY_PATH }}"
-            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
-            docker compose -f docker-compose.deploy.yml pull
-            docker compose -f docker-compose.deploy.yml up -d
-            docker image prune -f
